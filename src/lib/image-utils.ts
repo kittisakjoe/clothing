@@ -413,9 +413,6 @@ export async function convertGreenToTransparent(
   }
 }
 
-// Check if running on Vercel
-const isVercel = process.env.VERCEL === '1';
-
 /**
  * Get the public URL or data URL for an image
  * On Vercel: returns base64 data URL (since /tmp is not web-accessible)
