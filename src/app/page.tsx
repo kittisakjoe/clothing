@@ -78,12 +78,12 @@ export default function HomePage() {
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [results, setResults] = useState<ResultItem[]>([]);
-  const [pipelineSteps, setPipelineSteps] = useState([
-    { label: 'Generate', description: 'Create', status: 'pending' as const },
-    { label: 'Dress', description: 'Put on Model', status: 'pending' as const },
-    { label: 'Extract', description: 'Remove BG', status: 'pending' as const },
-    { label: 'Final', description: 'Ready', status: 'pending' as const },
-    { label: 'Save', description: 'Auto Save', status: 'pending' as const },
+  const [pipelineSteps, setPipelineSteps] = useState<{ label: string; description: string; status: 'pending' | 'active' | 'complete' | 'error' }[]>([
+    { label: 'Generate', description: 'Create', status: 'pending' },
+    { label: 'Dress', description: 'Put on Model', status: 'pending' },
+    { label: 'Extract', description: 'Remove BG', status: 'pending' },
+    { label: 'Final', description: 'Ready', status: 'pending' },
+    { label: 'Save', description: 'Auto Save', status: 'pending' },
   ]);
 
   const [showSettings, setShowSettings] = useState(false);
@@ -181,7 +181,7 @@ export default function HomePage() {
     setIsProcessing(true);
     setProgress(0);
     setResults([]);
-    setPipelineSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' as const })));
+    setPipelineSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' })));
     addLog('info', '🚀 Starting pipeline...');
     abortRef.current = new AbortController();
 
@@ -223,7 +223,7 @@ export default function HomePage() {
             switch (data.type) {
               case 'progress': setProgress(data.progress || 0); addLog('info', data.message); break;
               case 'item_start': currentResults.set(data.itemIndex, { itemName: data.itemName }); addLog('step', data.message); break;
-              case 'step_start': addLog('info', data.message); setPipelineSteps((prev) => prev.map((s, i) => i === data.step - 1 ? { ...s, status: 'active' as const } : s)); break;
+              case 'step_start': addLog('info', data.message); setPipelineSteps((prev) => prev.map((s, i) => i === data.step - 1 ? { ...s, status: 'active' } : s)); break;
               case 'step_complete': {
                 const item = currentResults.get(data.itemIndex) || { itemName: `Item ${data.itemIndex + 1}` };
                 if (data.step === 1) item.step1Image = data.imageUrl;
@@ -235,14 +235,14 @@ export default function HomePage() {
                 setResults(Array.from(currentResults.values()));
                 setProgress(data.progress || 0);
                 addLog('success', data.message);
-                setPipelineSteps((prev) => prev.map((s, i) => i === data.step - 1 ? { ...s, status: 'complete' as const } : s));
+                setPipelineSteps((prev) => prev.map((s, i) => i === data.step - 1 ? { ...s, status: 'complete' } : s));
                 break;
               }
               case 'step_skip': addLog('warning', data.message); break;
-              case 'item_complete': addLog('success', data.message); setPipelineSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' as const }))); break;
+              case 'item_complete': addLog('success', data.message); setPipelineSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' }))); break;
               case 'item_error': { const item = currentResults.get(data.itemIndex) || { itemName: `Item ${data.itemIndex + 1}` }; item.error = data.error; currentResults.set(data.itemIndex, item); setResults(Array.from(currentResults.values())); addLog('error', data.message); break; }
               case 'error': addLog('error', data.message); break;
-              case 'done': setProgress(100); addLog('success', data.message); setPipelineSteps((prev) => prev.map((s) => ({ ...s, status: 'complete' as const }))); break;
+              case 'done': setProgress(100); addLog('success', data.message); setPipelineSteps((prev) => prev.map((s) => ({ ...s, status: 'complete' }))); break;
             }
           } catch {}
         }
