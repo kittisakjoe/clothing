@@ -2,6 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 
+// Check if running on Vercel
+const isVercel = process.env.VERCEL === '1';
+const TEMP_BASE = isVercel ? '/tmp' : path.resolve('./public');
+
 /**
  * Save a base64 image to disk
  */
@@ -10,8 +14,17 @@ export function saveBase64Image(
   outputDir: string,
   fileName: string
 ): string {
-  // Ensure output directory exists
-  const absoluteDir = path.resolve(outputDir);
+  // Handle both absolute paths and relative paths
+  let absoluteDir: string;
+  if (outputDir.startsWith('/tmp')) {
+    absoluteDir = outputDir;
+  } else if (isVercel) {
+    // On Vercel, redirect to /tmp
+    absoluteDir = path.join('/tmp', outputDir.replace('./public', '').replace('public', ''));
+  } else {
+    absoluteDir = path.resolve(outputDir);
+  }
+  
   if (!fs.existsSync(absoluteDir)) {
     fs.mkdirSync(absoluteDir, { recursive: true });
   }
@@ -29,6 +42,7 @@ export function saveBase64Image(
   const filePath = path.join(absoluteDir, fullFileName);
 
   fs.writeFileSync(filePath, buffer);
+  console.log(`[saveBase64Image] Saved to: ${filePath}`);
 
   return filePath;
 }
@@ -399,20 +413,77 @@ export async function convertGreenToTransparent(
   }
 }
 
+// Check if running on Vercel
+const isVercel = process.env.VERCEL === '1';
+
 /**
- * Get the relative public URL for a saved file
+ * Get the public URL or data URL for an image
+ * On Vercel: returns base64 data URL (since /tmp is not web-accessible)
+ * Locally: returns relative URL path
  */
-export function getPublicUrl(filePath: string): string {
+export function getPublicUrl(filePathOrBase64: string): string {
+  // If it's already a data URL, return as-is
+  if (filePathOrBase64.startsWith('data:')) {
+    return filePathOrBase64;
+  }
+  
+  // On Vercel, read file and return data URL
+  if (isVercel) {
+    try {
+      const buffer = fs.readFileSync(filePathOrBase64);
+      const ext = path.extname(filePathOrBase64).toLowerCase();
+      const mimeType = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 
+                       ext === '.webp' ? 'image/webp' : 'image/png';
+      return `data:${mimeType};base64,${buffer.toString('base64')}`;
+    } catch (e) {
+      console.error('[getPublicUrl] Error reading file:', e);
+      return filePathOrBase64;
+    }
+  }
+  
+  // Local: return relative URL
   const publicDir = path.resolve('./public');
-  const relativePath = path.relative(publicDir, filePath);
+  const relativePath = path.relative(publicDir, filePathOrBase64);
   return `/${relativePath.replace(/\\/g, '/')}`;
+}
+
+/**
+ * Save image - uses /tmp on Vercel, ./public locally
+ */
+export function saveBase64ImageSmart(
+  base64Data: string,
+  subDir: string,
+  fileName: string
+): string {
+  const baseDir = isVercel ? '/tmp' : path.resolve('./public');
+  const outputDir = path.join(baseDir, subDir);
+  
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  const base64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+  const buffer = Buffer.from(base64, 'base64');
+
+  let ext = '.png';
+  if (base64Data.startsWith('data:image/jpeg')) ext = '.jpg';
+  else if (base64Data.startsWith('data:image/webp')) ext = '.webp';
+
+  const fullFileName = fileName.includes('.') ? fileName : `${fileName}${ext}`;
+  const filePath = path.join(outputDir, fullFileName);
+
+  fs.writeFileSync(filePath, buffer);
+  console.log(`[saveBase64ImageSmart] Saved to: ${filePath}`);
+
+  return filePath;
 }
 
 /**
  * Ensure directory exists
  */
 export function ensureDir(dirPath: string): void {
-  const absolutePath = path.resolve(dirPath);
+  const basePath = isVercel && !dirPath.startsWith('/tmp') ? '/tmp' : '';
+  const absolutePath = basePath ? path.join(basePath, dirPath) : path.resolve(dirPath);
   if (!fs.existsSync(absolutePath)) {
     fs.mkdirSync(absolutePath, { recursive: true });
   }

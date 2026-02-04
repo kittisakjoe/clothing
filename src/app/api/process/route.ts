@@ -122,10 +122,14 @@ export async function POST(request: NextRequest) {
         const stepsPerItem = 5;
         let completedSteps = 0;
 
+        // Use /tmp on Vercel, ./public locally
+        const isVercel = process.env.VERCEL === '1';
+        const outputBase = isVercel ? '/tmp/output' : './public/output';
+
         for (let i = 0; i < step1Items.length; i++) {
           const item = step1Items[i];
           const itemName = sanitizeFileName(item.name || `Item_${i + 1}`);
-          const tempDir = `./public/output/${itemName}`;
+          const tempDir = `${outputBase}/${itemName}`;
           ensureDir(tempDir);
 
           send({ type: 'item_start', itemIndex: i, itemName: item.name, message: `Processing ${i + 1}/${totalItems}: ${item.name}` });
@@ -184,11 +188,15 @@ export async function POST(request: NextRequest) {
             if (step5Data[i]) {
               send({ type: 'step_start', itemIndex: i, step: 5, message: `[${item.name}] Step 5: Saving...` });
               const { folder, filename } = step5Data[i];
-              const folderPath = path.join(step5BasePath || './public/output', folder);
+              const basePath = isVercel ? '/tmp/output' : (step5BasePath || './public/output');
+              const folderPath = path.join(basePath, folder);
               ensureDir(folderPath);
-              saveBase64Image(step4Image, folderPath, filename);
+              const savedPath = saveBase64Image(step4Image, folderPath, filename);
               completedSteps++;
-              send({ type: 'step_complete', itemIndex: i, step: 5, savedPath: `${folder}/${filename}.png`, message: `[${item.name}] Saved: ${folder}/${filename}.png`, progress: 10 + (completedSteps / (totalItems * stepsPerItem)) * 85 });
+              
+              // On Vercel, return base64 data URL for download
+              const downloadUrl = getPublicUrl(savedPath);
+              send({ type: 'step_complete', itemIndex: i, step: 5, savedPath: `${folder}/${filename}.png`, downloadUrl, message: `[${item.name}] Saved: ${folder}/${filename}.png`, progress: 10 + (completedSteps / (totalItems * stepsPerItem)) * 85 });
             } else {
               completedSteps++;
               send({ type: 'step_skip', itemIndex: i, step: 5, message: `[${item.name}] Step 5 skipped` });

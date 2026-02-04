@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
+// Check if running on Vercel
+const isVercel = process.env.VERCEL === '1';
+const OUTPUT_BASE = isVercel ? '/tmp/output' : './public/output';
+
 interface FileItem {
   name: string;
   path: string;
@@ -10,6 +14,7 @@ interface FileItem {
   modified?: string;
   extension?: string;
   children?: FileItem[];
+  dataUrl?: string; // For Vercel: base64 data URL
 }
 
 function getFileTree(dirPath: string, basePath: string = ''): FileItem[] {
@@ -38,14 +43,29 @@ function getFileTree(dirPath: string, basePath: string = ''): FileItem[] {
         const stats = fs.statSync(fullPath);
         const ext = path.extname(entry.name).toLowerCase();
         
-        items.push({
+        const item: FileItem = {
           name: entry.name,
           path: relativePath,
           type: 'file',
           size: stats.size,
           modified: stats.mtime.toISOString(),
           extension: ext,
-        });
+        };
+        
+        // On Vercel, include base64 data URL for images
+        if (isVercel && ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(ext)) {
+          try {
+            const buffer = fs.readFileSync(fullPath);
+            const mimeType = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 
+                           ext === '.webp' ? 'image/webp' : 
+                           ext === '.gif' ? 'image/gif' : 'image/png';
+            item.dataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+          } catch (e) {
+            console.error('Error reading file for dataUrl:', e);
+          }
+        }
+        
+        items.push(item);
       }
     }
     
@@ -88,13 +108,13 @@ function countFiles(items: FileItem[]): { folders: number; files: number; totalS
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const basePath = searchParams.get('path') || './public/output';
+  const basePath = searchParams.get('path') || OUTPUT_BASE;
   
   try {
-    const absolutePath = path.resolve(basePath);
+    const absolutePath = isVercel ? basePath : path.resolve(basePath);
     
     // Security check: ensure path is within allowed directory
-    const allowedBase = path.resolve('./public/output');
+    const allowedBase = isVercel ? '/tmp' : path.resolve('./public/output');
     if (!absolutePath.startsWith(allowedBase)) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
@@ -104,7 +124,8 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      basePath,
+      basePath: OUTPUT_BASE,
+      isVercel,
       tree,
       stats: {
         folders: counts.folders,
@@ -126,10 +147,12 @@ export async function DELETE(request: NextRequest) {
   }
   
   try {
-    const absolutePath = path.resolve('./public/output', filePath);
+    const absolutePath = isVercel 
+      ? path.join('/tmp/output', filePath)
+      : path.resolve('./public/output', filePath);
     
     // Security check
-    const allowedBase = path.resolve('./public/output');
+    const allowedBase = isVercel ? '/tmp' : path.resolve('./public/output');
     if (!absolutePath.startsWith(allowedBase)) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
