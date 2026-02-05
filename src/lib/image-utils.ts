@@ -301,12 +301,22 @@ export function saveClothingPieces(
 export function readImageAsBase64(filePath: string): string {
   console.log(`[readImageAsBase64] Input path: ${filePath}`);
   
+  // If already a data URL, return as-is
+  if (filePath.startsWith('data:')) {
+    return filePath;
+  }
+
   // Try multiple path resolutions
   const pathsToTry = [
     filePath,
+    // /tmp paths (Vercel)
+    filePath.startsWith('/tmp') ? filePath : `/tmp/uploads/${path.basename(filePath)}`,
+    // Local paths
     path.resolve(filePath),
     path.resolve(process.cwd(), filePath),
     path.resolve(process.cwd(), filePath.replace(/^\.\//, '')),
+    // public/ directory paths
+    path.resolve(process.cwd(), 'public', filePath.replace(/^\.?\/?public\//, '')),
   ];
 
   let absolutePath = '';

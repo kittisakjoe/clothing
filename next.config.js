@@ -3,12 +3,8 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['sharp'],
   },
-  api: {
-    bodyParser: {
-      sizeLimit: '50mb',
-    },
-    responseLimit: '50mb',
-  },
+  // Note: For App Router, body size limits are set per-route
+  // api.bodyParser is only for Pages Router
 };
 
 module.exports = nextConfig;
