@@ -2,18 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
-function getOutputBase(): { base: string; serverless: boolean } {
-  try {
-    const testDir = path.resolve('./public/output');
-    if (!fs.existsSync(testDir)) fs.mkdirSync(testDir, { recursive: true });
-    const testFile = path.join(testDir, '.test');
-    fs.writeFileSync(testFile, '');
-    fs.unlinkSync(testFile);
-    return { base: './public/output', serverless: false };
-  } catch {
-    return { base: '/tmp/output', serverless: true };
-  }
-}
+const OUTPUT_BASE = '/tmp/output';
 
 interface FileItem {
   name: string;
@@ -116,24 +105,20 @@ function countFiles(items: FileItem[]): { folders: number; files: number; totalS
 }
 
 export async function GET(request: NextRequest) {
-  const { base: OUTPUT_BASE, serverless } = getOutputBase();
   const searchParams = request.nextUrl.searchParams;
   const basePath = searchParams.get('path') || OUTPUT_BASE;
   
   try {
-    const absolutePath = serverless ? basePath : path.resolve(basePath);
-    const allowedBase = serverless ? '/tmp' : path.resolve('./public/output');
-    if (!absolutePath.startsWith(allowedBase)) {
+    if (!basePath.startsWith('/tmp')) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
     
-    const tree = getFileTree(absolutePath);
+    const tree = getFileTree(basePath);
     const counts = countFiles(tree);
     
     return NextResponse.json({
       success: true,
       basePath: OUTPUT_BASE,
-      serverless,
       tree,
       stats: {
         folders: counts.folders,
@@ -147,7 +132,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const { base: OUTPUT_BASE, serverless } = getOutputBase();
   const body = await request.json();
   const { filePath } = body;
   
@@ -156,12 +140,9 @@ export async function DELETE(request: NextRequest) {
   }
   
   try {
-    const absolutePath = serverless 
-      ? path.join('/tmp/output', filePath)
-      : path.resolve('./public/output', filePath);
+    const absolutePath = path.join('/tmp/output', filePath);
     
-    const allowedBase = serverless ? '/tmp' : path.resolve('./public/output');
-    if (!absolutePath.startsWith(allowedBase)) {
+    if (!absolutePath.startsWith('/tmp')) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
     

@@ -3,39 +3,19 @@ import path from 'path';
 import sharp from 'sharp';
 
 /**
- * Check if running in serverless (read-only filesystem)
- * Tests by trying to write to ./public - if fails, use /tmp
- */
-function isServerless(): boolean {
-  try {
-    const testDir = path.resolve('./public/output');
-    if (!fs.existsSync(testDir)) {
-      fs.mkdirSync(testDir, { recursive: true });
-    }
-    const testFile = path.join(testDir, '.write-test');
-    fs.writeFileSync(testFile, 'test');
-    fs.unlinkSync(testFile);
-    return false; // Can write = local
-  } catch {
-    return true; // Can't write = serverless
-  }
-}
-
-/**
- * Save a base64 image to disk
+ * Save a base64 image to disk - always uses /tmp
  */
 export function saveBase64Image(
   base64Data: string,
   outputDir: string,
   fileName: string
 ): string {
+  // Always redirect to /tmp
   let absoluteDir: string;
   if (outputDir.startsWith('/tmp')) {
     absoluteDir = outputDir;
-  } else if (isServerless()) {
-    absoluteDir = path.join('/tmp', outputDir.replace(/^\.?\/?public\/?/, ''));
   } else {
-    absoluteDir = path.resolve(outputDir);
+    absoluteDir = path.join('/tmp', outputDir.replace(/^\.?\/?public\/?/, ''));
   }
   
   if (!fs.existsSync(absoluteDir)) {
@@ -466,15 +446,14 @@ export function getPublicUrl(filePathOrBase64: string): string {
 }
 
 /**
- * Save image - uses /tmp on serverless, ./public locally
+ * Save image - always uses /tmp
  */
 export function saveBase64ImageSmart(
   base64Data: string,
   subDir: string,
   fileName: string
 ): string {
-  const baseDir = isServerless() ? '/tmp' : path.resolve('./public');
-  const outputDir = path.join(baseDir, subDir);
+  const outputDir = path.join('/tmp', subDir);
   
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -497,16 +476,14 @@ export function saveBase64ImageSmart(
 }
 
 /**
- * Ensure directory exists
+ * Ensure directory exists - always uses /tmp for non-absolute paths
  */
 export function ensureDir(dirPath: string): void {
   let absolutePath: string;
   if (dirPath.startsWith('/tmp')) {
     absolutePath = dirPath;
-  } else if (isServerless()) {
-    absolutePath = path.join('/tmp', dirPath.replace(/^\.?\/?public\/?/, ''));
   } else {
-    absolutePath = path.resolve(dirPath);
+    absolutePath = path.join('/tmp', dirPath.replace(/^\.?\/?public\/?/, ''));
   }
   if (!fs.existsSync(absolutePath)) {
     fs.mkdirSync(absolutePath, { recursive: true });
