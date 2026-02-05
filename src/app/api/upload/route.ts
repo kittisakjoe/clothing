@@ -3,9 +3,29 @@ import fs from 'fs';
 import path from 'path';
 import { getSheetInfo } from '@/lib/excel-reader';
 
-// Use /tmp on Vercel (serverless), ./public locally
-const isVercel = process.env.VERCEL === '1';
-const UPLOADS_DIR = isVercel ? '/tmp/uploads' : path.resolve('./public/uploads');
+function getUploadsDir(): string {
+  // Always try /tmp first on serverless
+  try {
+    const tmpDir = '/tmp/uploads';
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+    // Test if writable
+    const testFile = path.join(tmpDir, '.write-test');
+    fs.writeFileSync(testFile, 'test');
+    fs.unlinkSync(testFile);
+    console.log('[Upload] Using /tmp/uploads');
+    return tmpDir;
+  } catch {
+    // Fallback to local
+    const localDir = path.resolve('./public/uploads');
+    if (!fs.existsSync(localDir)) {
+      fs.mkdirSync(localDir, { recursive: true });
+    }
+    console.log('[Upload] Using ./public/uploads');
+    return localDir;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,15 +37,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
     }
 
-    // Create uploads directory
-    if (!fs.existsSync(UPLOADS_DIR)) {
-      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-    }
+    const uploadsDir = getUploadsDir();
 
     // Save file
     const buffer = Buffer.from(await file.arrayBuffer());
     const fileName = `${type || 'file'}_${Date.now()}_${file.name}`;
-    const filePath = path.join(UPLOADS_DIR, fileName);
+    const filePath = path.join(uploadsDir, fileName);
     fs.writeFileSync(filePath, buffer);
 
     console.log(`[Upload] Saved to: ${filePath}`);

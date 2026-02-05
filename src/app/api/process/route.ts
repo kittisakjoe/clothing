@@ -122,9 +122,18 @@ export async function POST(request: NextRequest) {
         const stepsPerItem = 5;
         let completedSteps = 0;
 
-        // Use /tmp on Vercel, ./public locally
-        const isVercel = process.env.VERCEL === '1';
-        const outputBase = isVercel ? '/tmp/output' : './public/output';
+        // Detect if filesystem is writable (serverless = read-only)
+        let outputBase = './public/output';
+        try {
+          const testDir = path.resolve('./public/output');
+          if (!fs.existsSync(testDir)) fs.mkdirSync(testDir, { recursive: true });
+          const testFile = path.join(testDir, '.test');
+          fs.writeFileSync(testFile, '');
+          fs.unlinkSync(testFile);
+        } catch {
+          outputBase = '/tmp/output';
+          console.log('[Process] Serverless detected, using /tmp/output');
+        }
 
         for (let i = 0; i < step1Items.length; i++) {
           const item = step1Items[i];
@@ -188,7 +197,7 @@ export async function POST(request: NextRequest) {
             if (step5Data[i]) {
               send({ type: 'step_start', itemIndex: i, step: 5, message: `[${item.name}] Step 5: Saving...` });
               const { folder, filename } = step5Data[i];
-              const basePath = isVercel ? '/tmp/output' : (step5BasePath || './public/output');
+              const basePath = outputBase.startsWith('/tmp') ? '/tmp/output' : (step5BasePath || './public/output');
               const folderPath = path.join(basePath, folder);
               ensureDir(folderPath);
               const savedPath = saveBase64Image(step4Image, folderPath, filename);

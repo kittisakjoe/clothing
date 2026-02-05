@@ -2,9 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 
-// Check if running on Vercel
-const isVercel = process.env.VERCEL === '1';
-const OUTPUT_BASE = isVercel ? '/tmp/output' : './public/output';
+function getOutputBase(): { base: string; serverless: boolean } {
+  try {
+    const testDir = path.resolve('./public/output');
+    if (!fs.existsSync(testDir)) fs.mkdirSync(testDir, { recursive: true });
+    const testFile = path.join(testDir, '.test');
+    fs.writeFileSync(testFile, '');
+    fs.unlinkSync(testFile);
+    return { base: './public/output', serverless: false };
+  } catch {
+    return { base: '/tmp/output', serverless: true };
+  }
+}
 
 interface FileItem {
   name: string;
@@ -53,7 +62,7 @@ function getFileTree(dirPath: string, basePath: string = ''): FileItem[] {
         };
         
         // On Vercel, include base64 data URL for images
-        if (isVercel && ['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(ext)) {
+        if (['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(ext)) {
           try {
             const buffer = fs.readFileSync(fullPath);
             const mimeType = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 
@@ -107,14 +116,13 @@ function countFiles(items: FileItem[]): { folders: number; files: number; totalS
 }
 
 export async function GET(request: NextRequest) {
+  const { base: OUTPUT_BASE, serverless } = getOutputBase();
   const searchParams = request.nextUrl.searchParams;
   const basePath = searchParams.get('path') || OUTPUT_BASE;
   
   try {
-    const absolutePath = isVercel ? basePath : path.resolve(basePath);
-    
-    // Security check: ensure path is within allowed directory
-    const allowedBase = isVercel ? '/tmp' : path.resolve('./public/output');
+    const absolutePath = serverless ? basePath : path.resolve(basePath);
+    const allowedBase = serverless ? '/tmp' : path.resolve('./public/output');
     if (!absolutePath.startsWith(allowedBase)) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
@@ -125,7 +133,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       basePath: OUTPUT_BASE,
-      isVercel,
+      serverless,
       tree,
       stats: {
         folders: counts.folders,
@@ -139,6 +147,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const { base: OUTPUT_BASE, serverless } = getOutputBase();
   const body = await request.json();
   const { filePath } = body;
   
@@ -147,12 +156,11 @@ export async function DELETE(request: NextRequest) {
   }
   
   try {
-    const absolutePath = isVercel 
+    const absolutePath = serverless 
       ? path.join('/tmp/output', filePath)
       : path.resolve('./public/output', filePath);
     
-    // Security check
-    const allowedBase = isVercel ? '/tmp' : path.resolve('./public/output');
+    const allowedBase = serverless ? '/tmp' : path.resolve('./public/output');
     if (!absolutePath.startsWith(allowedBase)) {
       return NextResponse.json({ success: false, error: 'Access denied' }, { status: 403 });
     }
@@ -162,7 +170,6 @@ export async function DELETE(request: NextRequest) {
     }
     
     const stats = fs.statSync(absolutePath);
-    
     if (stats.isDirectory()) {
       fs.rmSync(absolutePath, { recursive: true });
     } else {

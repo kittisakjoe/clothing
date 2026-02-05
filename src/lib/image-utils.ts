@@ -2,9 +2,24 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 
-// Check if running on Vercel
-const isVercel = process.env.VERCEL === '1';
-const TEMP_BASE = isVercel ? '/tmp' : path.resolve('./public');
+/**
+ * Check if running in serverless (read-only filesystem)
+ * Tests by trying to write to ./public - if fails, use /tmp
+ */
+function isServerless(): boolean {
+  try {
+    const testDir = path.resolve('./public/output');
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir, { recursive: true });
+    }
+    const testFile = path.join(testDir, '.write-test');
+    fs.writeFileSync(testFile, 'test');
+    fs.unlinkSync(testFile);
+    return false; // Can write = local
+  } catch {
+    return true; // Can't write = serverless
+  }
+}
 
 /**
  * Save a base64 image to disk
@@ -14,13 +29,11 @@ export function saveBase64Image(
   outputDir: string,
   fileName: string
 ): string {
-  // Handle both absolute paths and relative paths
   let absoluteDir: string;
   if (outputDir.startsWith('/tmp')) {
     absoluteDir = outputDir;
-  } else if (isVercel) {
-    // On Vercel, redirect to /tmp
-    absoluteDir = path.join('/tmp', outputDir.replace('./public', '').replace('public', ''));
+  } else if (isServerless()) {
+    absoluteDir = path.join('/tmp', outputDir.replace(/^\.?\/?public\/?/, ''));
   } else {
     absoluteDir = path.resolve(outputDir);
   }
@@ -29,11 +42,9 @@ export function saveBase64Image(
     fs.mkdirSync(absoluteDir, { recursive: true });
   }
 
-  // Remove data URI prefix
   const base64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
   const buffer = Buffer.from(base64, 'base64');
 
-  // Determine extension from data URI
   let ext = '.png';
   if (base64Data.startsWith('data:image/jpeg')) ext = '.jpg';
   else if (base64Data.startsWith('data:image/webp')) ext = '.webp';
@@ -434,8 +445,8 @@ export function getPublicUrl(filePathOrBase64: string): string {
     return filePathOrBase64;
   }
   
-  // On Vercel, read file and return data URL
-  if (isVercel) {
+  // If file is in /tmp (serverless), read and return data URL
+  if (filePathOrBase64.startsWith('/tmp')) {
     try {
       const buffer = fs.readFileSync(filePathOrBase64);
       const ext = path.extname(filePathOrBase64).toLowerCase();
@@ -455,14 +466,14 @@ export function getPublicUrl(filePathOrBase64: string): string {
 }
 
 /**
- * Save image - uses /tmp on Vercel, ./public locally
+ * Save image - uses /tmp on serverless, ./public locally
  */
 export function saveBase64ImageSmart(
   base64Data: string,
   subDir: string,
   fileName: string
 ): string {
-  const baseDir = isVercel ? '/tmp' : path.resolve('./public');
+  const baseDir = isServerless() ? '/tmp' : path.resolve('./public');
   const outputDir = path.join(baseDir, subDir);
   
   if (!fs.existsSync(outputDir)) {
@@ -489,8 +500,14 @@ export function saveBase64ImageSmart(
  * Ensure directory exists
  */
 export function ensureDir(dirPath: string): void {
-  const basePath = isVercel && !dirPath.startsWith('/tmp') ? '/tmp' : '';
-  const absolutePath = basePath ? path.join(basePath, dirPath) : path.resolve(dirPath);
+  let absolutePath: string;
+  if (dirPath.startsWith('/tmp')) {
+    absolutePath = dirPath;
+  } else if (isServerless()) {
+    absolutePath = path.join('/tmp', dirPath.replace(/^\.?\/?public\/?/, ''));
+  } else {
+    absolutePath = path.resolve(dirPath);
+  }
   if (!fs.existsSync(absolutePath)) {
     fs.mkdirSync(absolutePath, { recursive: true });
   }
