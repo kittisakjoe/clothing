@@ -3,6 +3,7 @@ import { readColumnData } from '@/lib/excel-reader';
 import { generateImageFromPrompt, dressManneqin, extractClothingWithReference, generateSegmentationMask } from '@/lib/openrouter';
 import { saveBase64Image, readImageAsBase64, getPublicUrl, ensureDir, sanitizeFileName, applyMaskToImage, convertGreenToTransparent } from '@/lib/image-utils';
 import path from 'path';
+import fs from 'fs';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
