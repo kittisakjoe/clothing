@@ -10,6 +10,7 @@ interface FileItem {
   modified?: string;
   extension?: string;
   children?: FileItem[];
+  dataUrl?: string;
 }
 
 interface FileManagerProps {
@@ -108,7 +109,8 @@ export default function FileManager({ onClose }: FileManagerProps) {
   const handleFileClick = (item: FileItem) => {
     setSelectedFile(item);
     if (item.type === 'file' && ['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(item.extension || '')) {
-      setPreviewImage(`/output/${item.path}`);
+      // Use dataUrl from API (works on Vercel), fallback to URL path (works locally)
+      setPreviewImage(item.dataUrl || `/output/${item.path}`);
     } else {
       setPreviewImage(null);
     }

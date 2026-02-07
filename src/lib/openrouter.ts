@@ -191,42 +191,53 @@ function extractTextFromResponse(data: OpenRouterResponse): string {
  */
 export async function generateImageFromPrompt(
   prompt: string,
-  model: string = 'google/gemini-2.5-flash-image'
+  model: string = 'google/gemini-3-pro-image-preview'
 ): Promise<string> {
-  console.log(`[Step 1] Generating image with model: ${model}`);
-  console.log(`[Step 1] Prompt: ${prompt.substring(0, 100)}...`);
+  const startTime = Date.now();
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`[Step 1] REQUEST - Generate Image`);
+  console.log(`${'='.repeat(60)}`);
+  console.log(`[Step 1] Model: ${model}`);
+  console.log(`[Step 1] Prompt (${prompt.length} chars):`);
+  console.log(`[Step 1] "${prompt}"`);
+  console.log(`[Step 1] Sending request...`);
+
+  const requestBody = {
+    model,
+    messages: [
+      {
+        role: 'user',
+        content: `Generate an image: ${prompt}`,
+      },
+    ],
+    modalities: ['image', 'text'],
+    max_tokens: 4096,
+  };
 
   const response = await fetch(OPENROUTER_API_URL, {
     method: 'POST',
     headers: getHeaders(),
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: 'user',
-          content: `Generate an image: ${prompt}`,
-        },
-      ],
-      modalities: ['image', 'text'],
-      max_tokens: 4096,
-    }),
+    body: JSON.stringify(requestBody),
   });
+
+  const elapsed = Date.now() - startTime;
+  console.log(`[Step 1] Response status: ${response.status} (${elapsed}ms)`);
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[Step 1] API error (${response.status}):`, errorText);
+    console.error(`[Step 1] ❌ API error:`, errorText);
     throw new Error(`OpenRouter API failed (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
-  console.log(`[Step 1] Raw response keys:`, Object.keys(data));
-  console.log(`[Step 1] Response preview:`, JSON.stringify(data).substring(0, 800));
+  console.log(`[Step 1] Response keys:`, Object.keys(data));
+  console.log(`[Step 1] Response preview:`, JSON.stringify(data).substring(0, 500));
 
   // Try to extract images using the helper function
   try {
     const images = extractImagesFromResponse(data as OpenRouterResponse);
     if (images.length > 0) {
-      console.log(`[Step 1] Got ${images.length} image(s) via extractImagesFromResponse`);
+      console.log(`[Step 1] ✅ Got ${images.length} image(s) (total time: ${Date.now() - startTime}ms)`);
       return images[0];
     }
   } catch (err) {
@@ -1058,83 +1069,78 @@ CRITICAL REQUIREMENTS:
 }
 
 /**
- * Step 2 (v5): Dress mannequin with clothing from Step 1
- * Clothing image is ALWAYS first, followed by mannequin reference images
+ * Step 2: Dress mannequin with clothing from Step 1
+ * Image order: Step1 (clothing) → model-1 → model-2 → model-3
  */
 export async function dressManneqin(
   clothingImageBase64: string,
   mannequinImagesBase64: string[],
   prompt: string,
-  visionModel: string = 'google/gemini-2.5-flash',
-  imageGenModel?: string
+  model: string = 'google/gemini-3-pro-image-preview'
 ): Promise<string> {
-  console.log(`[Step 2] Dressing mannequin with ${mannequinImagesBase64.length} reference(s)`);
+  const startTime = Date.now();
+  
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`[Step 2] REQUEST - Dress Mannequin`);
+  console.log(`${'='.repeat(60)}`);
+  console.log(`[Step 2] Model: ${model}`);
+  console.log(`[Step 2] Input images: 1 clothing + ${mannequinImagesBase64.length} mannequin reference(s)`);
+  console.log(`[Step 2] XLSX prompt (${prompt.length} chars):`);
+  console.log(`[Step 2] "${prompt}"`);
 
   validateImage(clothingImageBase64, 'clothing');
   const clothingImage = ensureDataUri(clothingImageBase64);
 
-  const genModel = imageGenModel || 'google/gemini-2.5-flash-image';
-
-  // Build content array with clear instructions
+  // Build content: prompt + Step1 image + model-1 + model-2 + model-3
   const genContent: any[] = [
-    {
-      type: 'text',
-      text: `${prompt}
-
-TASK: Put the clothing from IMAGE 1 onto the mannequin/model from IMAGE 2.
-
-IMAGE 1 (first image): The CLOTHING item to use
-IMAGE 2+ (following images): The MANNEQUIN/MODEL - use this EXACT body pose and position
-
-REQUIREMENTS:
-1. Take the clothing from IMAGE 1
-2. Put it on the mannequin body from IMAGE 2
-3. Use the EXACT same pose, angle, and body position as IMAGE 2
-4. The clothing must FIT PERFECTLY on the mannequin body
-5. Keep the original clothing colors and details
-6. Professional fashion photography style
-7. Clean white/light background
-
-Generate the mannequin wearing the clothing now.`,
-    },
+    { type: 'text', text: prompt },
     { type: 'image_url', image_url: { url: clothingImage } },
   ];
   
   // Add ALL mannequin reference images
-  for (const mannequinImg of mannequinImagesBase64) {
-    validateImage(mannequinImg, 'mannequin');
+  for (let i = 0; i < mannequinImagesBase64.length; i++) {
+    const mannequinImg = mannequinImagesBase64[i];
+    validateImage(mannequinImg, `mannequin_${i}`);
     genContent.push({ 
       type: 'image_url', 
       image_url: { url: ensureDataUri(mannequinImg) } 
     });
+    console.log(`[Step 2] Added mannequin image ${i + 1} (${mannequinImg.length} bytes)`);
   }
 
-  console.log(`[Step 2] Sending ${mannequinImagesBase64.length} mannequin images to ${genModel}`);
+  console.log(`[Step 2] Sending request with ${genContent.length} content blocks...`);
 
   const genResponse = await fetch(OPENROUTER_API_URL, {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify({
-      model: genModel,
+      model: model,
       messages: [{ role: 'user', content: genContent }],
       modalities: ['image', 'text'],
       max_tokens: 4096,
     }),
   });
 
+  const elapsed = Date.now() - startTime;
+  console.log(`[Step 2] Response status: ${genResponse.status} (${elapsed}ms)`);
+
   if (!genResponse.ok) {
     const errorText = await genResponse.text();
+    console.error(`[Step 2] ❌ API error:`, errorText);
     throw new Error(`Dressing generation failed (${genResponse.status}): ${errorText}`);
   }
 
   const genData: OpenRouterResponse = await genResponse.json();
+  console.log(`[Step 2] Response keys:`, Object.keys(genData));
+  
   const images = extractImagesFromResponse(genData);
 
   if (images.length === 0) {
+    console.error(`[Step 2] ❌ No image in response`);
     throw new Error('No dressed mannequin image generated');
   }
 
-  console.log('[Step 2] Mannequin dressed successfully');
+  console.log(`[Step 2] ✅ Mannequin dressed successfully (total time: ${Date.now() - startTime}ms)`);
   return images[0];
 }
 
@@ -1308,79 +1314,153 @@ Output a clean black and white mask image.`,
 }
 
 /**
- * Generate clothing image on transparent background for Step 3
- * Instead of creating a mask, directly generate the extracted clothing
+ * Step 3: Extract clothing using xlsx prompt
+ * Image order: Step2 → model-3
  */
 export async function generateSegmentationMask(
   dressedImageBase64: string,
   referenceImagesBase64: string[],
-  clothingDescription: string,
-  visionModel: string = 'google/gemini-2.5-flash',
-  imageGenModel?: string
+  xlsxPrompt: string,
+  model: string = 'google/gemini-3-pro-image-preview'
 ): Promise<string> {
-  console.log(`[Step 3] Extracting clothing: ${clothingDescription}`);
-  console.log(`[Step 3] Reference images: ${referenceImagesBase64.length}`);
+  const startTime = Date.now();
+  
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`[Step 3] REQUEST - Extract Clothing`);
+  console.log(`${'='.repeat(60)}`);
+  console.log(`[Step 3] Model: ${model}`);
+  console.log(`[Step 3] Input images: 1 dressed + ${referenceImagesBase64.length} reference(s)`);
+  console.log(`[Step 3] XLSX prompt (${xlsxPrompt.length} chars):`);
+  console.log(`[Step 3] "${xlsxPrompt}"`);
 
   validateImage(dressedImageBase64, 'dressed');
   const dressedImage = ensureDataUri(dressedImageBase64);
 
-  // Direct extraction prompt - ask AI to generate clothing on transparent background
-  const extractPrompt = `Look at the image of a mannequin/model wearing a ${clothingDescription}.
-
-YOUR TASK: Generate ONLY the clothing item (${clothingDescription}) on a transparent background.
-
-REQUIREMENTS:
-1. Extract ONLY the ${clothingDescription} from the image
-2. Remove the mannequin/body completely - no arms, no legs, no skin
-3. The background must be TRANSPARENT (PNG with alpha)
-4. Keep the exact colors, patterns, and details of the clothing
-5. The clothing should appear as if floating - no body inside
-
-OUTPUT: A PNG image of just the ${clothingDescription} with transparent background, no mannequin visible.`;
-
+  // Build content: prompt + Step2 image + model-3
   const contentArray: any[] = [
-    { type: 'text', text: extractPrompt },
+    { type: 'text', text: xlsxPrompt },
     { type: 'image_url', image_url: { url: dressedImage } },
   ];
+  console.log(`[Step 3] Added dressed image (Step 2)`);
 
-  // Add reference images if available
-  for (const refImg of referenceImagesBase64) {
+  // Add model-3 reference image
+  for (let i = 0; i < referenceImagesBase64.length; i++) {
+    const refImg = referenceImagesBase64[i];
     try {
-      validateImage(refImg, 'reference');
+      validateImage(refImg, `reference_${i}`);
       contentArray.push({
         type: 'image_url',
         image_url: { url: ensureDataUri(refImg) },
       });
-    } catch {}
+      console.log(`[Step 3] Added reference image ${i + 1} (model-3)`);
+    } catch (err: any) {
+      console.warn(`[Step 3] Skipped invalid reference image ${i + 1}: ${err.message}`);
+    }
   }
 
-  console.log(`[Step 3] Sending request to ${imageGenModel || 'google/gemini-2.5-flash-image'}`);
+  console.log(`[Step 3] Sending request with ${contentArray.length} content blocks...`);
 
   const response = await fetch(OPENROUTER_API_URL, {
     method: 'POST',
     headers: getHeaders(),
     body: JSON.stringify({
-      model: imageGenModel || 'google/gemini-2.5-flash-image',
+      model: model,
       messages: [{ role: 'user', content: contentArray }],
       modalities: ['image', 'text'],
       max_tokens: 4096,
     }),
   });
 
+  const elapsed = Date.now() - startTime;
+  console.log(`[Step 3] Response status: ${response.status} (${elapsed}ms)`);
+
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`[Step 3] API Error: ${errorText}`);
-    throw new Error(`Clothing extraction failed (${response.status}): ${errorText}`);
+    console.error(`[Step 3] ❌ API error:`, errorText);
+    throw new Error(`Step 3 failed (${response.status}): ${errorText}`);
   }
 
   const data: OpenRouterResponse = await response.json();
+  console.log(`[Step 3] Response keys:`, Object.keys(data));
+  
   const images = extractImagesFromResponse(data);
 
   if (images.length === 0) {
-    console.error('[Step 3] No image in response');
-    throw new Error('No clothing image generated');
+    console.error(`[Step 3] ❌ No image in response`);
+    throw new Error('No image generated in Step 3');
   }
 
-  console.log('[Step 3] Clothing extracted successfully');
+  console.log(`[Step 3] ✅ Clothing extracted successfully (total time: ${Date.now() - startTime}ms)`);
+  return images[0];
+}
+
+/**
+ * Step 4: Combine Step2 and Step3 images
+ * Image order: Step2 → Step3
+ */
+export async function combineImages(
+  step2ImageBase64: string,
+  step3ImageBase64: string,
+  xlsxPrompt: string,
+  model: string = 'google/gemini-3-pro-image-preview'
+): Promise<string> {
+  const startTime = Date.now();
+  
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`[Step 4] REQUEST - Combine Images`);
+  console.log(`${'='.repeat(60)}`);
+  console.log(`[Step 4] Model: ${model}`);
+  console.log(`[Step 4] Input images: Step2 + Step3`);
+  console.log(`[Step 4] XLSX prompt (${xlsxPrompt.length} chars):`);
+  console.log(`[Step 4] "${xlsxPrompt}"`);
+
+  validateImage(step2ImageBase64, 'step2');
+  validateImage(step3ImageBase64, 'step3');
+  
+  const step2Image = ensureDataUri(step2ImageBase64);
+  const step3Image = ensureDataUri(step3ImageBase64);
+
+  // Build content: prompt + Step2 image + Step3 image
+  const contentArray: any[] = [
+    { type: 'text', text: xlsxPrompt },
+    { type: 'image_url', image_url: { url: step2Image } },
+    { type: 'image_url', image_url: { url: step3Image } },
+  ];
+  console.log(`[Step 4] Added Step2 image`);
+  console.log(`[Step 4] Added Step3 image`);
+
+  console.log(`[Step 4] Sending request with ${contentArray.length} content blocks...`);
+
+  const response = await fetch(OPENROUTER_API_URL, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({
+      model: model,
+      messages: [{ role: 'user', content: contentArray }],
+      modalities: ['image', 'text'],
+      max_tokens: 4096,
+    }),
+  });
+
+  const elapsed = Date.now() - startTime;
+  console.log(`[Step 4] Response status: ${response.status} (${elapsed}ms)`);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[Step 4] ❌ API error:`, errorText);
+    throw new Error(`Step 4 failed (${response.status}): ${errorText}`);
+  }
+
+  const data: OpenRouterResponse = await response.json();
+  console.log(`[Step 4] Response keys:`, Object.keys(data));
+  
+  const images = extractImagesFromResponse(data);
+
+  if (images.length === 0) {
+    console.error(`[Step 4] ❌ No image in response`);
+    throw new Error('No image generated in Step 4');
+  }
+
+  console.log(`[Step 4] ✅ Images combined successfully (total time: ${Date.now() - startTime}ms)`);
   return images[0];
 }

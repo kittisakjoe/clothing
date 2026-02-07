@@ -1,106 +1,37 @@
-# Clothing Pipeline 👗
+# Clothing Pipeline v8
 
-AI-powered clothing generation & extraction pipeline built with Next.js and OpenRouter.
+## What's New in v8
 
-## 🚀 Quick Start
+### Problem Solved
+- **เสื้อไม่ตรงกับ Step 1** → Step 4 เปลี่ยนเป็น code-based mask application
+- **Mask ไม่แม่นยำ** → Grayscale mask support + edge feathering
+- **Final ไม่ transparent จริง** → removeWhiteBackground() post-processing
+- **AI สร้างเสื้อใหม่** → Step 2 ใช้แค่ 1 mannequin ref (ลดจาก 3)
 
-### 1. Install Dependencies
+### Pipeline Flow
+```
+Step 1: Generate → AI (nano-banana-pro) text→image
+Step 2: Dress   → AI (nano-banana-pro) put clothing on mannequin
+Step 3: Mask    → AI (nano-banana-pro) create B&W segmentation mask
+Step 4: Extract → CODE (applyMask + removeBackground) true transparent PNG
+Step 5: Save    → Auto save to folder/filename from Excel
+```
+
+### Step 4 Modes
+- **Code-Based (Default)**: applyMaskToImage + removeWhiteBackground — clothing consistent
+- **AI-Based (Legacy)**: nano-banana-pro — clothing may change
+
+## Setup
 ```bash
 npm install
-```
-
-### 2. Setup Environment Variables
-
-**⚠️ IMPORTANT: Never commit API keys to Git!**
-
-```bash
-# Copy the example file
-cp .env.example .env.local
-
-# Edit .env.local and add your API key
-nano .env.local
-```
-
-```env
-OPENROUTER_API_KEY=sk-or-v1-your-actual-key-here
-```
-
-### 3. Run Development Server
-```bash
+cp .env.example .env.local  # Add REPLICATE_API_TOKEN
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
-
----
-
-## 🔐 Security Best Practices
-
-| File | Purpose | Git Status |
-|------|---------|------------|
-| `.env.example` | Template (no real keys) | ✅ Safe to commit |
-| `.env.local` | Your actual keys | ❌ **NEVER commit** |
-
-### For Vercel Deployment
-
-1. Go to Vercel Dashboard → Your Project → Settings → Environment Variables
-2. Add: `OPENROUTER_API_KEY` = `sk-or-v1-xxx...`
-3. Deploy/Redeploy
-
-### If You Accidentally Committed a Key
-
-1. **Revoke the key immediately** at [OpenRouter Keys](https://openrouter.ai/keys)
-2. Generate a new key
-3. Remove from Git history:
-```bash
-git filter-branch --force --index-filter \
-  "git rm --cached --ignore-unmatch .env.local" \
-  --prune-empty --tag-name-filter cat -- --all
-git push origin --force --all
-```
-
----
-
-## 📋 Pipeline Flow
-
-```
-Step 1: Generate    → รูปเสื้อผ้าจาก Prompt
-Step 2: Dress       → สวมเสื้อบนหุ่น
-Step 3: Extract     → ถอดเสื้อออกจากหุ่น (transparent BG)
-Step 4: Final       → ผลลัพธ์สุดท้าย
-Step 5: Save        → บันทึกไฟล์อัตโนมัติ
-```
-
-## 🛠️ Tech Stack
-
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Excel**: SheetJS (xlsx)
-- **AI**: OpenRouter (Gemini Flash)
-- **Streaming**: Server-Sent Events
-
-## 📁 Project Structure
-
-```
-src/
-├── app/
-│   ├── api/
-│   │   ├── process/route.ts   # Main pipeline
-│   │   ├── upload/route.ts    # File upload
-│   │   └── sheets/route.ts    # Excel reader
-│   └── page.tsx               # Main UI
-├── components/
-│   ├── FileUploadZone.tsx
-│   ├── DraggableImageList.tsx
-│   ├── ResultGallery.tsx
-│   └── ...
-└── lib/
-    ├── openrouter.ts          # AI API client
-    ├── excel-reader.ts
-    └── image-utils.ts
-```
-
-## 📝 License
-
-MIT
+## Files Changed (v7 → v8)
+- src/app/api/process/route.ts — Step 4 code-based + removeWhiteBackground
+- src/lib/replicate.ts — Step 2 single mannequin ref
+- src/lib/image-utils.ts — Improved mask with grayscale + feathering
+- src/app/page.tsx — Step 4 mode toggle
+- src/components/ResultGallery.tsx — Updated labels
+- PROMPTS_v8.md — Recommended Excel prompts

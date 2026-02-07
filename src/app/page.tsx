@@ -36,7 +36,7 @@ const DEFAULT_STEP2_IMAGES: ImageItem[] = [
 ];
 
 const DEFAULT_STEP3_IMAGES: ImageItem[] = [
-  { id: 'default-ref-1', url: '/images/model-1.png', name: 'model-1.png', filePath: './public/images/model-1.png' },
+  { id: 'default-ref-1', url: '/images/model-3.png', name: 'model-3.png', filePath: './public/images/model-3.png' },
 ];
 
 export default function HomePage() {
@@ -55,6 +55,7 @@ export default function HomePage() {
 
   const [step3Sheet, setStep3Sheet] = useState(SHEET_CATEGORY);
   const [step3PromptCol, setStep3PromptCol] = useState('');
+  const [step3VariableCol, setStep3VariableCol] = useState('');
   const [step3Images, setStep3Images] = useState<ImageItem[]>(DEFAULT_STEP3_IMAGES);
 
   const [step4Sheet, setStep4Sheet] = useState(SHEET_CATEGORY);
@@ -66,8 +67,8 @@ export default function HomePage() {
   const [step5FileCol, setStep5FileCol] = useState('');
   const [step5BasePath, setStep5BasePath] = useState('./public/output');
 
-  const [imageGenModel, setImageGenModel] = useState('google/gemini-2.5-flash-image');
-  const [visionModel, setVisionModel] = useState('google/gemini-2.5-flash');
+  const [imageGenModel, setImageGenModel] = useState('google/nano-banana-pro');
+  const [visionModel, setVisionModel] = useState('google/nano-banana-pro');
 
   const [rowMode, setRowMode] = useState<'all' | 'range' | 'count'>('count');
   const [rowStart, setRowStart] = useState(1);
@@ -79,11 +80,11 @@ export default function HomePage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [results, setResults] = useState<ResultItem[]>([]);
   const [pipelineSteps, setPipelineSteps] = useState<{ label: string; description: string; status: 'pending' | 'active' | 'complete' | 'error' }[]>([
-    { label: 'Generate', description: 'Create', status: 'pending' },
-    { label: 'Dress', description: 'Put on Model', status: 'pending' },
-    { label: 'Extract', description: 'Remove BG', status: 'pending' },
-    { label: 'Final', description: 'Ready', status: 'pending' },
-    { label: 'Save', description: 'Auto Save', status: 'pending' },
+    { label: 'Generate', description: 'สร้างภาพเสื้อผ้า', status: 'pending' },
+    { label: 'Dress', description: 'ใส่เสื้อลงหุ่น', status: 'pending' },
+    { label: 'Mask', description: 'สร้าง Mask', status: 'pending' },
+    { label: 'Extract', description: 'ตัดเสื้อออก', status: 'pending' },
+    { label: 'Save', description: 'บันทึก', status: 'pending' },
   ]);
 
   const [showSettings, setShowSettings] = useState(false);
@@ -137,10 +138,11 @@ export default function HomePage() {
         setStep2VariableCol(findColByLetter(categorySheet.columns, 'E'));
         setStep3Sheet(categorySheet.name);
         setStep3PromptCol(findColByLetter(categorySheet.columns, 'J'));
+        setStep3VariableCol(findColByLetter(categorySheet.columns, 'E'));
         setStep4Sheet(categorySheet.name);
         setStep4PromptCol(findColByLetter(categorySheet.columns, 'I'));
         setStep4VariableCol(findColByLetter(categorySheet.columns, 'E'));
-        addLog('success', `✓ "${SHEET_CATEGORY}" found - auto-selected G, E, J, I`);
+        addLog('success', `✓ "${SHEET_CATEGORY}" found - Step2:G, Step3:J, Step4:I, Var:E`);
       }
 
       addLog('success', `Loaded ${data.sheets?.length || 0} sheets`);
@@ -193,7 +195,7 @@ export default function HomePage() {
           excelPath, imageGenModel, visionModel,
           step1Sheet, step1PromptCol,
           step2Sheet, step2PromptCol, step2VariableCol, step2Images: step2Images.map((img) => img.filePath),
-          step3Sheet, step3PromptCol, step3Images: step3Images.map((img) => img.filePath),
+          step3Sheet, step3PromptCol, step3VariableCol, step3Images: step3Images.map((img) => img.filePath),
           step4Sheet, step4PromptCol, step4VariableCol,
           step5Sheet, step5FolderCol, step5FileCol, step5BasePath,
           rowMode, rowStart, rowEnd, rowCount,
@@ -223,7 +225,7 @@ export default function HomePage() {
             switch (data.type) {
               case 'progress': setProgress(data.progress || 0); addLog('info', data.message); break;
               case 'item_start': currentResults.set(data.itemIndex, { itemName: data.itemName }); addLog('step', data.message); break;
-              case 'step_start': addLog('info', data.message); setPipelineSteps((prev) => prev.map((s, i) => i === data.step - 1 ? { ...s, status: 'active' } : s)); break;
+              case 'step_start': addLog('info', data.message); if (data.prompt) addLog('step', `📝 Prompt: ${data.prompt}`); setPipelineSteps((prev) => prev.map((s, i) => i === data.step - 1 ? { ...s, status: 'active' } : s)); break;
               case 'step_complete': {
                 const item = currentResults.get(data.itemIndex) || { itemName: `Item ${data.itemIndex + 1}` };
                 if (data.step === 1) item.step1Image = data.imageUrl;
@@ -268,8 +270,8 @@ export default function HomePage() {
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M20.38 3.46 16 2 12 5.5 8 2 3.62 3.46 2 8l3.5 4L2 16l1.62 4.54L8 22l4-3.5 4 3.5 4.38-1.46L22 16l-3.5-4L22 8z" /></svg>
             </div>
             <div>
-              <h1 className="text-lg font-semibold">Clothing Pipeline v6</h1>
-              <p className="text-xs text-[var(--text-muted)]">5 Steps: Generate → Dress → Extract → Final → Save</p>
+              <h1 className="text-lg font-semibold">Clothing Pipeline v9</h1>
+              <p className="text-xs text-[var(--text-muted)]">nano-banana-pro • Generate → Dress → Mask → Extract → Save</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -299,7 +301,7 @@ export default function HomePage() {
             <div className="flex border-b border-[var(--border)] overflow-x-auto">
               {(['step1', 'step2', 'step3', 'step4', 'step5'] as const).map((tab, idx) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-shrink-0 px-5 py-3 text-sm font-medium whitespace-nowrap ${activeTab === tab ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-b-2 border-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
-                  {['1️⃣ Generate (E)', '2️⃣ Dress (G→E)', '3️⃣ Extract (J)', '4️⃣ Final', '5️⃣ Save (D,A)'][idx]}
+                  {['1️⃣ Generate', '2️⃣ Dress', '3️⃣ Mask', '4️⃣ Extract', '5️⃣ Save'][idx]}
                 </button>
               ))}
             </div>
@@ -308,7 +310,7 @@ export default function HomePage() {
               {activeTab === 'step1' && (
                 <div className="space-y-6">
                   <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
-                    <p className="text-sm text-blue-300"><strong>Sheet:</strong> {SHEET_PROMPT} | <strong>Prompt:</strong> Column E</p>
+                    <p className="text-sm text-blue-300"><strong>Sheet:</strong> เลือกได้ | <strong>Prompt:</strong> เลือก Column ด้านล่าง</p>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -340,17 +342,21 @@ export default function HomePage() {
               {activeTab === 'step2' && (
                 <div className="space-y-6">
                   <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
-                    <p className="text-sm text-blue-300"><strong>Sheet:</strong> {SHEET_CATEGORY} | <strong>Prompt:</strong> G | <strong>{'{{var}}'}</strong> → E</p>
+                    <p className="text-sm text-blue-300"><strong>Sheet:</strong> เลือกได้ | <strong>Prompt:</strong> เลือก Column | <strong>{'{{var}}'}</strong> → Variable Column</p>
                   </div>
-                  <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
-                    <p className="text-sm text-yellow-300">💡 ทุก {'{{variable_name}}'} จะถูกแทนด้วยค่าจาก <strong>Column E</strong></p>
+                  <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30">
+                    <p className="text-sm text-purple-300">
+                      👕 <strong>เอาเสื้อจาก Step 1 ใส่หุ่น:</strong><br/>
+                      • image_1 = รูป Step1 | image_2 = model-1 | image_3 = model-2 | image_4 = model-3<br/>
+                      • Prompt จาก Column G + Variable จาก Column E
+                    </p>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Sheet</label><select value={step2Sheet} onChange={(e) => setStep2Sheet(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm">{sheets.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
                     <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Prompt <span className="text-green-400">(G)</span></label><select value={step2PromptCol} onChange={(e) => setStep2PromptCol(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-green-500/30 text-sm">{getSheetByName(step2Sheet)?.columns.map((col, idx) => <option key={idx} value={col}>{col}</option>)}</select></div>
                     <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Variable <span className="text-yellow-400">(E)</span></label><select value={step2VariableCol} onChange={(e) => setStep2VariableCol(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-yellow-500/30 text-sm">{getSheetByName(step2Sheet)?.columns.map((col, idx) => <option key={idx} value={col}>{col}</option>)}</select></div>
                   </div>
-                  <DraggableImageList images={step2Images} onReorder={setStep2Images} onRemove={(id) => setStep2Images((prev) => prev.filter((img) => img.id !== id))} onAdd={(files) => handleStep2ImagesUpload(files)} label="🧍 Mannequin Images (รูป Step 1 จะอยู่แรก)" />
+                  <DraggableImageList images={step2Images} onReorder={setStep2Images} onRemove={(id) => setStep2Images((prev) => prev.filter((img) => img.id !== id))} onAdd={(files) => handleStep2ImagesUpload(files)} label="🧍 Mannequin Images (ลำดับ: Step1 → model-1 → model-2 → model-3)" />
                   <button onClick={() => setStep2Images(DEFAULT_STEP2_IMAGES)} className="text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] transition">🔄 Reset to Default Images</button>
                 </div>
               )}
@@ -358,34 +364,41 @@ export default function HomePage() {
               {activeTab === 'step3' && (
                 <div className="space-y-6">
                   <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
-                    <p className="text-sm text-blue-300"><strong>Sheet:</strong> {SHEET_CATEGORY} | <strong>Prompt:</strong> J | 👕 Extract Clothing</p>
+                    <p className="text-sm text-blue-300"><strong>Sheet:</strong> เลือกได้ | <strong>Prompt:</strong> เลือก Column | <strong>{'{{var}}'}</strong> → Variable Column</p>
                   </div>
                   <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30">
                     <p className="text-sm text-purple-300">
-                      👕 <strong>Output:</strong> เสื้อผ้าบน Transparent Background<br/>
-                      • ใช้คำอธิบายจาก <strong>Column E</strong> เป็นตัวบอก AI ว่าเสื้อผ้าคืออะไร<br/>
-                      • AI จะถอดเสื้อผ้าออกจากหุ่นโดยตรง
+                      🎭 <strong>สร้าง Mask ให้ fit กับ Model:</strong><br/>
+                      • Input: 1.รูป Step2, 2.model-3 (reference for size)<br/>
+                      • Prompt จาก Column ที่เลือก
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Sheet</label><select value={step3Sheet} onChange={(e) => setStep3Sheet(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm">{sheets.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
                     <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Prompt <span className="text-green-400">(J)</span></label><select value={step3PromptCol} onChange={(e) => setStep3PromptCol(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-green-500/30 text-sm">{getSheetByName(step3Sheet)?.columns.map((col, idx) => <option key={idx} value={col}>{col}</option>)}</select></div>
+                    <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Variable <span className="text-yellow-400">(E)</span></label><select value={step3VariableCol} onChange={(e) => setStep3VariableCol(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-yellow-500/30 text-sm">{getSheetByName(step3Sheet)?.columns.map((col, idx) => <option key={idx} value={col}>{col}</option>)}</select></div>
                   </div>
-                  <DraggableImageList images={step3Images} onReorder={setStep3Images} onRemove={(id) => setStep3Images((prev) => prev.filter((img) => img.id !== id))} onAdd={(files) => handleStep3ImagesUpload(files)} label="📸 Reference Images (ช่วย AI เข้าใจรูปแบบเสื้อผ้า)" />
-                  <button onClick={() => setStep3Images(DEFAULT_STEP3_IMAGES)} className="text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] transition">🔄 Reset to Default Images</button>
+                  <DraggableImageList images={step3Images} onReorder={setStep3Images} onRemove={(id) => setStep3Images((prev) => prev.filter((img) => img.id !== id))} onAdd={(files) => handleStep3ImagesUpload(files)} label="🧍 Reference Images (model-3)" />
+                  <button onClick={() => setStep3Images(DEFAULT_STEP3_IMAGES)} className="text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] transition">🔄 Reset to Default (model-3)</button>
                 </div>
               )}
 
               {activeTab === 'step4' && (
                 <div className="space-y-6">
                   <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
-                    <p className="text-sm text-blue-300"><strong>Step 4:</strong> Final Result | ใช้ผลจาก Step 3 โดยตรง</p>
+                    <p className="text-sm text-blue-300"><strong>Sheet:</strong> เลือกได้ | <strong>Prompt:</strong> เลือก Column | <strong>{'{{var}}'}</strong> → Variable Column</p>
                   </div>
-                  <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/30">
-                    <p className="text-sm text-green-300">
-                      ✅ <strong>Output:</strong> เสื้อผ้าบน Transparent Background<br/>
-                      • พร้อมสำหรับบันทึกใน Step 5
+                  <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/30">
+                    <p className="text-sm text-orange-300">
+                      ✨ <strong>ตัดเสื้อออกจากหุ่น:</strong><br/>
+                      • image_1 = รูป Step2 (หุ่นใส่เสื้อ) | image_2 = รูป Step3 (mask)<br/>
+                      • Prompt จาก Column I + Variable จาก Column E
                     </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Sheet</label><select value={step4Sheet} onChange={(e) => setStep4Sheet(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm">{sheets.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}</select></div>
+                    <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Prompt <span className="text-green-400">(I)</span></label><select value={step4PromptCol} onChange={(e) => setStep4PromptCol(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-green-500/30 text-sm">{getSheetByName(step4Sheet)?.columns.map((col, idx) => <option key={idx} value={col}>{col}</option>)}</select></div>
+                    <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Variable <span className="text-yellow-400">(E)</span></label><select value={step4VariableCol} onChange={(e) => setStep4VariableCol(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-yellow-500/30 text-sm">{getSheetByName(step4Sheet)?.columns.map((col, idx) => <option key={idx} value={col}>{col}</option>)}</select></div>
                   </div>
                 </div>
               )}
@@ -412,10 +425,10 @@ export default function HomePage() {
 
         {showSettings && (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border)] p-6 space-y-5">
-            <h3 className="text-base font-semibold">⚙️ Models</h3>
+            <h3 className="text-base font-semibold">⚙️ Settings</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Image Gen</label><input type="text" value={imageGenModel} onChange={(e) => setImageGenModel(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm font-mono" /></div>
-              <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Vision</label><input type="text" value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm font-mono" /></div>
+              <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Image Gen Model</label><input type="text" value={imageGenModel} onChange={(e) => setImageGenModel(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm font-mono" /></div>
+              <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-2 uppercase">Vision Model</label><input type="text" value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm font-mono" /></div>
             </div>
           </div>
         )}
@@ -434,7 +447,7 @@ export default function HomePage() {
         {results.length > 0 && <div><h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase mb-4">Results ({results.length})</h3><div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border)] p-6"><ResultGallery results={results} /></div></div>}
       </main>
 
-      <footer className="border-t border-[var(--border)] mt-16 py-6 text-center"><p className="text-xs text-[var(--text-muted)]">Clothing Pipeline v6.0 — 5-Step Workflow</p></footer>
+      <footer className="border-t border-[var(--border)] mt-16 py-6 text-center"><p className="text-xs text-[var(--text-muted)]">Clothing Pipeline v9 — nano-banana-pro • Generate → Dress → Mask → Extract → Save</p></footer>
 
       {showFileManager && <FileManager onClose={() => setShowFileManager(false)} />}
     </div>

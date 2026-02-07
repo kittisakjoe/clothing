@@ -65,8 +65,8 @@ export default function ResultGallery({ results }: ResultGalleryProps) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <ImageBox image={current.step1Image} label="1️⃣ Generated" />
             <ImageBox image={current.step2Image} label="2️⃣ Dressed" pending="Skipped" />
-            <ImageBox image={current.step3Image} label="3️⃣ Extracted" showTransparent={true} />
-            <ImageBox image={current.step4Image} label="4️⃣ Final" showTransparent={true} />
+            <ImageBox image={current.step3Image} label="3️⃣ Mask" />
+            <ImageBox image={current.step4Image} label="4️⃣ Extracted" />
           </div>
 
           {current.savedPath && (
